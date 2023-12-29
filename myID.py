@@ -305,45 +305,101 @@ def group_data_into_periods(data, start_year, end_year, period_length):
     return pd.DataFrame(grouped_data)
 
 
-def plot_urban_rural_population(urban_population, rural_population, start_year, end_year, period=10):
+def plot_urban_rural_population(urban_data, rural_data):
     """
-    Plots multiple pie charts for urban vs rural population over different periods, each period spanning 10 years.
-    Parameters:
-    urban_population : dict
-        A dictionary with years as keys and urban population as values.
-    rural_population : dict
-        A dictionary with years as keys and rural population as values.
-    start_year : int
-        The starting year for the data.
-    end_year : int
-        The ending year for the data.
-    period : int
-        The number of years in each period to group the data.
-    """
-    # Determine the number of periods and create subplot for each pie chart
-    num_periods = (end_year - start_year + 1) // period
-    fig, axs = plt.subplots(1, num_periods, figsize=(5 * num_periods, 5))
+    Plots multiple pie charts for urban vs rural population over different periods.
     
-    # If only one pie chart is needed, put axs in a list to make it iterable
+    Parameters:
+    urban_data : DataFrame
+        DataFrame with periods as columns and aggregated urban population as values.
+    rural_data : DataFrame
+        DataFrame with periods as columns and aggregated rural population as values.
+    """
+   # Determine the number of periods and create subplot for each pie chart
+    num_periods = len(urban_data.columns)
+    fig, axs = plt.subplots(1, num_periods, figsize=(num_periods * 5, 5))  # Adjust width for each subplot
+
+    # Ensure axs is iterable
     if num_periods == 1:
         axs = [axs]
 
+    # Define the color scheme
+    colors = ['#5B9BD5', '#FFC000']  # Blue for urban, Gold for rural
+
     # Loop through each period and create pie charts
-    for i, period_start in enumerate(range(start_year, end_year, period)):
-        period_end = period_start + period
-        period_urban_pop = sum(urban_population.get(year, 0) for year in range(period_start, period_end))
-        period_rural_pop = sum(rural_population.get(year, 0) for year in range(period_start, period_end))
-        
+    for i, period in enumerate(urban_data.columns):
+        period_urban_pop = urban_data[period].sum()
+        period_rural_pop = rural_data[period].sum()
+
         data = [period_urban_pop, period_rural_pop]
-        labels = ['Urban Population', 'Rural Population']
-        colors = ['#ff9999', '#66b3ff']
-        explode = (0.1, 0)  # explode the first slice
+        explode = (0.1, 0)  # Explode the first slice (Urban)
 
-        # Plot the pie chart
-        axs[i].pie(data, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
-        axs[i].set_title(f'{period_start} - {period_end - 1}')
+        # Plot the pie chart with the desired styling
+        wedges, texts, autotexts = axs[i].pie(data, explode=explode, colors=colors, 
+                                              autopct='%1.1f%%', startangle=90, pctdistance=0.75)
+        # Increase the font size of the percentages and set their color to black
+        plt.setp(autotexts, size=10, weight="bold", color='black')
 
-    plt.suptitle('Urban vs Rural Population Distribution over 10-Year Periods')
+        # Draw a circle at the center to achieve the donut shape
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+        axs[i].add_artist(centre_circle)
+
+        # Set the title for each pie chart
+        axs[i].set_title(f"{period}", color='black', size=14)
+
+    # Adjust the layout
+    plt.subplots_adjust(wspace=0.3, hspace=0.3)  # Adjust the spacing between the subplots
+
+    # Create a legend for the colors used
+    fig.legend(wedges, ['Urban Population', 'Rural Population'],
+                loc='lower center', bbox_to_anchor=(0.5, 0), ncol=num_periods)
+
+    plt.suptitle('Urban vs Rural Population Distribution Over Periods', color='black', size=16)
+    plt.show()
+    
+    
+def plot_stacked_bar(data, title, x_label, y_label, legend_title):
+    """
+    Creates a stacked bar chart for grouped data.
+    
+    Parameters:
+    data : DataFrame
+        DataFrame containing the data to plot, indexed by period with categories as columns.
+    title : str
+        The title of the plot.
+    x_label, y_label : str
+        Labels for the x and y axes.
+    legend_title : str
+        The title of the legend.
+    """
+    # Create the figure and axis objects
+    fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
+
+    # Initialize the bottom position for the stacked bars
+    bottom = np.zeros(len(data))
+
+    # Create the stacked bar chart
+    for column in data.columns:
+        ax.bar(data.index, data[column], bottom=bottom, label=column)
+        bottom += data[column].values
+
+    # Annotate the bars with the total for each period
+    for idx, period in enumerate(data.index):
+        total = bottom[idx]
+        ax.text(idx, total, f'{total:.1f}', va='bottom', ha='center', color='black')
+
+    # Set labels and title
+    ax.set_xlabel(x_label, fontsize=12)
+    ax.set_ylabel(y_label, fontsize=12)
+    ax.set_title(title, fontsize=14, fontweight='bold')
+
+    # Add the legend
+    ax.legend(title=legend_title)
+
+    # Rotate the x-axis labels if necessary
+    plt.xticks(rotation=45)
+
+    # Adjust layout and display the plot
     plt.tight_layout()
     plt.show()
 
@@ -393,6 +449,48 @@ def plot_urban_rural_pop(grouped_urban, grouped_rural):
 
     # Adjust layout and display the plot
     plt.tight_layout()
+    plt.show()
+    
+    
+def plot_migration_trends(migration_data):
+    """
+    Creates a time series plot for net migration data for each country.
+
+    Parameters:
+    migration_data : DataFrame
+        DataFrame containing the migration data with countries as rows and years as columns.
+    """
+    # Create the figure
+    fig, ax = plt.subplots(figsize=(15, 10))
+
+    # Plot time series for each country
+    years = migration_data.columns.astype(int)
+    for country in migration_data.index:
+        # Apply a simple rolling mean to smooth the lines
+        rolling_mean = migration_data.loc[country].rolling(window=3, min_periods=1).mean()
+        ax.plot(years, rolling_mean, label=country)
+
+    # Add a zero-line for reference
+    ax.axhline(0, color='black', linewidth=0.8, linestyle='--')
+
+    # Formatting
+    ax.set_xlabel('Year', fontsize=14)
+    ax.set_ylabel('Net Migration', fontsize=14)
+    ax.set_title('Net Migration Trends Over Time', fontsize=16)
+    ax.grid(True)
+    
+    # Scale y-axis to log for better visualization
+    ax.set_yscale('symlog')
+
+    # Improve the legend
+    handles, labels = ax.get_legend_handles_labels()
+    # Sort both handles and labels based on labels
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
+    # Add legend outside of the plot to avoid blocking the view
+    ax.legend(handles, labels, loc='center left', bbox_to_anchor=(1, 0.5), title='Country Name')
+
+    # Show plot with tight layout
+    plt.tight_layout(rect=[0, 0, 0.85, 1])
     plt.show()
     
 
@@ -480,19 +578,36 @@ def main():
     # grouping the data into periods for the stacked bar graph of urban vs rural population 
     urban_pop = filtered_dfs['urban_population_trans.csv']
     rural_pop = filtered_dfs['rural_population_trans.csv']
+    agriculture_data = filtered_dfs['agriculture_land_trans.csv']
+    migration_data = filtered_dfs['net_migration_trans.csv']
     
     #grouping in periods
-    group_urban_pop = group_data_into_periods(urban_pop, start_year, end_year, 5)
-    group_rural_pop = group_data_into_periods(rural_pop, start_year, end_year, 5)
+    group_urban_pop = group_data_into_periods(urban_pop, start_year, end_year, 10)
+    group_rural_pop = group_data_into_periods(rural_pop, start_year, end_year, 10)
     
     # plot for urban vs rural population 
     plot_urban_rural_pop(group_urban_pop, group_rural_pop)
     
     # plot pie charts for urban vs rural population 
-    plot_urban_rural_population(urban_pop, rural_pop, start_year, end_year)
+    plot_urban_rural_population(group_urban_pop, group_rural_pop)
     
+    # Grouping agricultural land data
+    agricultural_land_grouped = group_data_into_periods(agriculture_data, 1990, 2022, 10)
+
+    # Grouping migration data
+    #migration_data_grouped = group_data_into_periods(migration_data, 1990, 2022, 10)
     
-    
+    # For Agricultural Land Data
+    plot_stacked_bar(agricultural_land_grouped, 
+                     'Agricultural Land Use Over Time', 
+                     'Land Area', 
+                     'Period', 
+                     'Type of Land Use')
+
+    # For Migration Data
+    plot_migration_trends(migration_data)
+        
+
 
 if __name__ == "__main__":
     main()
