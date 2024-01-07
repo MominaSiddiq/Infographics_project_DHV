@@ -545,6 +545,5 @@ if __name__ == "__main__":
         fontdict = font_style,
         bbox=bbox_props
     )
-
-    # Save the figure
-    plt.savefig("22047438.png", dpi = 300)
+    # Show the figure 
+    plt.show()
